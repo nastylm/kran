@@ -1,16 +1,15 @@
-#Class for making perspective transformations
-
 import cv2
 import numpy as np
 import math
 from MarkerPose import MarkerPose
 
+# конвертировать в реальные координаты
 class PerspectiveCorrecter:
     def __init__(self, imageCoordinates, worldCoordinates):
         src = np.array(imageCoordinates, np.float32)
         dst = np.array(worldCoordinates, np.float32)
         self.transformMatrix = cv2.getPerspectiveTransform(src,dst)
-        
+
     def convert(self, coordinate):
         newcoordinate = np.array([coordinate[0], coordinate[1], 1], np.float32)
         temp = np.dot(self.transformMatrix, newcoordinate)
@@ -18,10 +17,6 @@ class PerspectiveCorrecter:
         return [temp[0], temp[1]]
         
     def convertPose(self, pose):
-        # Idea is to take the input pose and convert it to two points, the 
-        # location and a director. These two points are then perspective 
-        # corrected and the transformed orientation can then be determined 
-        # from the two points.
         location = [pose.x, pose.y]      
         orientation = pose.theta
         dist = 10
