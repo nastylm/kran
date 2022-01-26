@@ -1,4 +1,3 @@
-#Python class for detecting markers
 
 import cv2
 import numpy as np
@@ -7,9 +6,6 @@ from MarkerPose import MarkerPose
 
 
 class MarkerTracker:
-    """
-    Purpose: Locate a certain marker in an image.
-    """
 
     def __init__(self, order, kernel_size, scale_factor):
         self.kernel_size = kernel_size
@@ -25,23 +21,24 @@ class MarkerTracker:
         self.orientation = None
         self.track_marker_with_missing_black_leg = True
 
-        # Create kernel used to remove arm in quality-measure
+        # Создание ядра для поиска
         (kernel_remove_arm_real, kernel_remove_arm_imag) = self.generate_symmetry_detector_kernel(1, self.kernel_size)
         self.kernelComplex = np.array(kernel_real + 1j*kernel_imag, dtype=complex)
         self.KernelRemoveArmComplex = np.array(kernel_remove_arm_real + 1j*kernel_remove_arm_imag, dtype=complex)
 
-        # Values used in quality-measure
+        # Измерение качества, переменные
         absolute = np.absolute(self.kernelComplex)
-        self.threshold = 0.2*absolute.max()
+        self.threshold = 0.4*absolute.max()
         self.quality = None
         self.y1 = int(math.floor(float(self.kernel_size)/2))
         self.y2 = int(math.ceil(float(self.kernel_size)/2))
         self.x1 = int(math.floor(float(self.kernel_size)/2))
         self.x2 = int(math.ceil(float(self.kernel_size)/2))
 
-        # Information about the located marker.
+        # Информация о локации маркера
         self.pose = None
 
+    # Симметричный детектор, задание
     @staticmethod
     def generate_symmetry_detector_kernel(order, kernel_size):
         # type: (int, int) -> numpy.ndarray
@@ -55,12 +52,13 @@ class MarkerTracker:
 
         return np.real(kernel), np.imag(kernel)
 
+    # Локализация маркера
     def locate_marker(self, frame):
         assert len(frame.shape) == 2, "Input image is not a single channel image."
         self.frame_real = frame.copy()
         self.frame_imag = frame.copy()
 
-        # Calculate convolution and determine response strength.
+        # Рассчет свертки
         self.frame_real = cv2.filter2D(self.frame_real, cv2.CV_32F, self.mat_real)
         self.frame_imag = cv2.filter2D(self.frame_imag, cv2.CV_32F, self.mat_imag)
         frame_real_squared = cv2.multiply(self.frame_real, self.frame_real, dtype=cv2.CV_32F)
@@ -75,6 +73,7 @@ class MarkerTracker:
         self.pose = MarkerPose(max_loc[0], max_loc[1], self.orientation, self.quality, self.order)
         return self.pose
 
+    # Распознавание метки при отклонениях
     def determine_marker_orientation(self, frame):
         (xm, ym) = self.last_marker_location
         real_value = self.frame_real[ym, xm]
@@ -108,10 +107,11 @@ class MarkerTracker:
             angle -= 2 * math.pi
         return angle
 
+    # Измерение качества маркера
     def determine_marker_quality(self, frame):
         (bright_regions, dark_regions) = self.generate_template_for_quality_estimator()
-        #cv2.imshow("bright_regions", 255*bright_regions)
-        #cv2.imshow("dark_regions", 255*dark_regions)
+        # cv2.imshow("bright_regions", 255*bright_regions)
+        # cv2.imshow("dark_regions", 255*dark_regions)
 
         try:
             frame_img = self.extract_window_around_maker_location(frame)
@@ -120,7 +120,7 @@ class MarkerTracker:
 
             mean_difference = bright_mean - dark_mean
             normalised_mean_difference = mean_difference / (0.5*bright_std + 0.5*dark_std)
-            # for translating the normalised_mean_differences to the range [0, 1]
+            # перевод the normalised_mean_differences к диапазону [0, 1]
             temp_value_for_quality = 1 - 1/(1 + math.exp(0.75*(-7+normalised_mean_difference)))
             self.quality = temp_value_for_quality
         except Exception as e:
@@ -129,14 +129,14 @@ class MarkerTracker:
             self.quality = 0.0
             return
 
+    # Вырезание маркера
     def extract_window_around_maker_location(self, frame):
         (xm, ym) = self.last_marker_location
         frame_tmp = np.array(frame[ym - self.y1:ym + self.y2, xm - self.x1:xm + self.x2])
         frame_img = frame_tmp.astype(np.uint8)
-        #cv2.imshow("dark", frame_img)
         return frame_img
 
-
+    # Создание шаблона для оценки качества
     def generate_template_for_quality_estimator(self):
         phase = np.exp((self.limit_angle_to_range(-self.orientation)) * 1j)
         angle_threshold = 3.14 / (2 * self.order)
